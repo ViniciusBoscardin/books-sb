@@ -2,96 +2,81 @@ import React from "react";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { useRouter } from "next/router";
-import { collectGenerateParams } from "next/dist/build/utils";
 import { data } from "autoprefixer";
 import {
   QueryClient,
   QueryClientProvider,
   useQuery,
 } from "@tanstack/react-query";
+import { BookList } from "./BookList";
 
-function SearchInput() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const { isLoading, error, data } = useQuery(["repoData", searchTerm], () =>
-    fetch(`https://openlibrary.org/search.json?q=${searchTerm}`).then((res) =>
-      res.json()
-    )
-  );
-
-  const handleClick = () => {
-    console.log("the button was clicked");
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center object-bottom">
-        <div className="text-2xl font-bold">Loading...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center">
-        <div className="text-2xl font-bold text-red-500">An error has occurred: {error.message}</div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      
-      <input
-        type="text"
-        value={searchTerm}
-        onChange={(event) => setSearchTerm(event.target.value)}
-        placeholder="Digite aqui sua busca"
-        className="px-4 py-2 text-white-800 border border-gray-300 rounded mb-4"
-      />
-      {data && data.docs.length > 0 && (
-        <button
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="absolute top-0 right-0 h-full px-4 text-gray-600 focus:outline-none"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`h-4 w-4 transition-transform transform ${
-              isDropdownOpen ? "rotate-180" : ""
-            }`}
-          >
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
-        </button>
-      )}
-      <button
-        onClick={handleClick}
-        className="px-4 py-2 bg-slate-500 hover:bg-slate-700 text-white font-bold rounded"
-      >
-        Buscar
-      </button>
-      {data && (
-        <div className={`mt-4 ${isDropdownOpen ? "block" : "hidden"}`}>
-          <h1 className="text-2xl font-bold mb-2">{data.name}</h1>
-          <p>{data.description}</p>
-          {/* Dados retornados pela API */}
-          {data.docs.map((doc) => (
-            <div key={doc.key} className="my-2">
-              <h1>{doc.title}</h1>
-              <strong>{doc.author_name}</strong>
-              <strong>{doc.publish_date}</strong>
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  );
+export interface Book {
+  key: string;
+  title: string;
+  author_name?: string[];
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
 }
 
-export default SearchInput;
+// interface queryResponse {
+//   docs: Book[];
+//   numFound: number;
+//   numFoundExact: boolean;
+// }
+
+const SearchBar = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  const { data, isLoading, isError } = useQuery<Book[]>(
+    ["search", searchTerm, currentPage, pageSize],
+    () => fetchSearchResults(searchTerm, currentPage, pageSize)
+  );
+
+  const fetchSearchResults = async (
+    searchTerm: string,
+    page: number,
+    pageSize: number
+  ) => {
+    const startIndex = (page - 1) * pageSize;
+    const response = await fetch(
+      `https://openlibrary.org/search.json?q=${searchTerm}&page=${page}&limit=${pageSize}`
+    );
+    const data = await response.json();
+    return data.docs as Book[];
+  };
+  // console.log(data);
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    setSearchTerm(e.target.value);
+  };
+
+  return (
+    <div className="flex flex-col justify-center items-center min-h-screen">
+      <h1 className="text-3xl font-bold m-5">Biblioteca</h1>
+      <form>
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={handleSearch}
+          placeholder="Search..."
+          className="border-2 border-gray-300 bg-white h-10 px-5 pr-16 rounded-lg text-sm focus:outline-none"
+        />
+      </form>
+      {isLoading ? (
+        <div className="flex items-center justify-center">
+          <span className="loading loading-spinner loading-lg mt-5"></span>
+        </div>
+      ) : isError ? (
+        <div>Error </div>
+      ) : (
+        <BookList books={data} />
+      )}
+    </div>
+  );
+};
+
+export default SearchBar;
